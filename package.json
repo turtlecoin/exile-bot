@@ -1,0 +1,24 @@
+{
+  "name": "turtlecoin-exile-bot",
+  "version": "0.0.1",
+  "description": "TurtleCoin Discord Exile Bot",
+  "main": "index.js",
+  "scripts": {
+    "test": "standard",
+    "start": "node index.js"
+  },
+  "author": "Brandon Lehmann <brandonlehmann@gmail.com>",
+  "license": "AGPL-3.0",
+  "dependencies": {
+    "bufferutil": "^4.0.1",
+    "discord.js": "^11.4.2",
+    "erlpack": "^0.1.2",
+    "libsodium-wrappers": "^0.7.3",
+    "node-opus": "^0.3.1",
+    "opusscript": "0.0.6",
+    "random-number": "0.0.9",
+    "sodium": "^3.0.2",
+    "sqlite3": "^4.0.4",
+    "uws": "^99.0.0"
+  }
+}
