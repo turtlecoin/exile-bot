@@ -16,6 +16,8 @@
   "exileRoleName": "exiled",
   "exileChannelName": "exile",
   "inmateNamePrefix": "INMATE",
+  "reaction": "👌",
+  "deleteAfter": 3000,
   "trigger": "*",
   "exileMessage": "Welcome to exile! You've made it here because you've broken one of the few rules we have in this server. During your stay here you'll be unable to fully utilize the chat capabilities of this server. If you repent and learn the errors of your ways, you may make it out and back into the general population.",
   "exileEvadeMessage": "Welcome back! I see you've gone and wandered off while you thought I wasn't looking. No worries though, I remember who you are! Get back in here!"
