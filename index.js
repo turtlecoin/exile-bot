@@ -104,10 +104,6 @@ Client.on('message', (message) => {
      that we are connected to */
   if (Config.serverIds.indexOf(message.guild.id) === -1) return
 
-  /* Check to see if the message came from one of the hard
-     coded users in our config file, if not, we're done */
-  if (Config.enforcers.indexOf(message.author.id) === -1) return
-
   /* Go get our role that we want to use for members */
   const role = message.guild.roles.find(r => r.name === Config.exileRoleName)
   const channel = message.guild.channels.find(channel => channel.name === Config.exileChannelName)
@@ -115,6 +111,10 @@ Client.on('message', (message) => {
   if (!role || !channel) return
 
   if (message.content.startsWith(`${Config.trigger}exile`)) {
+    message.delete(Config.deleteAfter).catch((error) => { log(error) })
+
+    if (Config.enforcers.indexOf(message.author.id) === -1) return
+
     message.mentions.members.forEach((member) => {
       if (Config.enforcers.indexOf(member.id) !== -1) return
 
@@ -127,23 +127,31 @@ Client.on('message', (message) => {
           log(`${oldNickname} is already exiled`)
           throw new BreakSignal()
         }
-        return exile(member.id, oldNickname)
-      }).then(() => {
-        return member.setNickname(newNickname)
+        return new Promise((resolve, reject) => {
+          member.setNickname(newNickname).then(() => { return resolve() }).catch(() => { return resolve() })
+        })
       }).then(() => {
         log(`${message.author.username} changed nickname of "${oldNickname}" to "${newNickname}"`)
         return member.addRole(role)
       }).then(() => {
+        return exile(member.id, oldNickname)
+      }).then(() => {
         log(`${message.author.username} assigned role "${role.name}" to "${newNickname}"`)
         const mention = member.toString()
         return channel.send(`${mention} ${Config.exileMessage}`)
+      }).then(() => {
+        return message.react(Config.reaction)
       }).catch((error) => {
         if (!(error instanceof BreakSignal)) {
-          log(`Error assigning "${role.name}" to "${member.displayName}"`)
+          log(`Error assigning "${role.name}" to "${member.displayName}": ${error}`)
         }
       })
     })
-  } else if (message.content.startsWith(`${Config.trigger}release`)) {
+  } else if (message.content.startsWith(`${Config.trigger}release`) || message.content.startsWith(`${Config.trigger}unexile`)) {
+    message.delete(Config.deleteAfter).catch((error) => { log(error) })
+
+    if (Config.enforcers.indexOf(message.author.id) === -1) return
+
     message.mentions.members.forEach((member) => {
       isExiled(member.id).then((status) => {
         if (!status) {
@@ -152,9 +160,13 @@ Client.on('message', (message) => {
         }
         return release(member.id)
       }).then((oldNickname) => {
-        return member.setNickname(oldNickname)
+        return new Promise((resolve, reject) => {
+          member.setNickname(oldNickname).then(() => { return resolve() }).catch(() => { return resolve() })
+        })
       }).then(() => {
         return member.removeRole(role)
+      }).then(() => {
+        return message.react(Config.reaction)
       }).then(() => {
         log(`${message.author.username} removed role "${role.name}" from "${member.displayName}"`)
       }).catch((error) => {
@@ -181,7 +193,9 @@ Client.on('guildMemberAdd', (member) => {
       throw new BreakSignal()
     }
 
-    return member.setNickname(newNickname)
+    return new Promise((resolve, reject) => {
+      member.setNickname(newNickname).then(() => { return resolve() }).catch(() => { return resolve() })
+    })
   }).then(() => {
     log(`Autojoin changed nickname of "${oldNickname}" to "${newNickname}"`)
     return member.addRole(role)
