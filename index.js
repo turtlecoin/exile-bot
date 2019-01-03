@@ -17,7 +17,7 @@ const db = new Sqlite3.Database(Config.database, (err) => {
   run([
     'CREATE TABLE IF NOT EXISTS ',
     'exiled_users ',
-    '(id TEXT PRIMARY KEY, oldNickname TEXT)'
+    '(id TEXT PRIMARY KEY, oldNickname TEXT, reason TEXT)'
   ].join('')).then(() => {
     log('Connected to backend database')
   }).catch(() => {
@@ -57,9 +57,23 @@ function isExiled (id) {
   })
 }
 
-function exile (id, oldNickname) {
+function getExileReason (id) {
   return new Promise((resolve, reject) => {
-    run('INSERT INTO exiled_users (id, oldNickname) VALUES (?,?)', [id, oldNickname]).then(() => {
+    get('SELECT reason FROM exiled_users WHERE id = ?', [id]).then((row) => {
+      return resolve(row.reason)
+    }).catch(() => {
+      return resolve('')
+    })
+  })
+}
+
+function exile (id, oldNickname, reason) {
+  reason = reason || ''
+  reason = reason.replace(`${Config.trigger}exile`, '')
+  reason = reason.replace(/<@[0-9]*>/, '')
+  reason = reason.trim()
+  return new Promise((resolve, reject) => {
+    run('INSERT INTO exiled_users (id, oldNickname, reason) VALUES (?,?,?)', [id, oldNickname, reason]).then(() => {
       return resolve(true)
     }).catch(() => {
       return reject(new Error('Could not save exile to database'))
@@ -78,6 +92,80 @@ function release (id) {
     }).catch(() => {
       return reject(new Error('Could not release user from database'))
     })
+  })
+}
+
+function execExile (message, member, channel, role) {
+  const oldNickname = member.displayName
+  const id = RandomNumber()
+  const newNickname = `${Config.inmateNamePrefix} ${id}`
+
+  /* Check to see if they are already exiled */
+  isExiled(member.id).then((status) => {
+    if (status) {
+      log(`${oldNickname} is already exiled`)
+      throw new BreakSignal()
+    }
+
+    /* Try to change their nickname */
+    return new Promise((resolve, reject) => {
+      member.setNickname(newNickname).then(() => { return resolve() }).catch(() => { return resolve() })
+    })
+  }).then(() => {
+    log(`${message.author.username} changed nickname of "${oldNickname}" to "${newNickname}"`)
+    /* Add the role to their account */
+    return member.addRole(role)
+  }).then(() => {
+    /* Store the exile in the database */
+    return exile(member.id, oldNickname, message.content.toString())
+  }).then(() => {
+    log(`${message.author.username} assigned role "${role.name}" to "${newNickname}"`)
+    const mention = member.toString()
+
+    /* Try to send a message to the channel letting them know they are exiled */
+    return new Promise((resolve, reject) => {
+      channel.send(`${mention} ${Config.exileMessage}`).then(() => { return resolve() }).catch(() => { return resolve() })
+    })
+  }).then(() => {
+    /* React to the initial message */
+    return message.react(Config.reaction)
+  }).catch((error) => {
+    if (!(error instanceof BreakSignal)) {
+      log(`Error assigning "${role.name}" to "${member.displayName}": ${error}`)
+    }
+  })
+}
+
+function execRelease (message, member, channel, role) {
+  var oldNickname
+
+  /* Check to see if they are already exiled */
+  isExiled(member.id).then((status) => {
+    if (!status) {
+      log(`${member.displayName} is not currently exiled`)
+      throw new BreakSignal()
+    }
+
+    /* remove the exile from the database */
+    return release(member.id)
+  }).then((oldNick) => {
+    oldNickname = oldNick
+    /* Remove the role from their account */
+    return member.removeRole(role)
+  }).then(() => {
+    /* Try to change their nickname */
+    return new Promise((resolve, reject) => {
+      member.setNickname(oldNickname).then(() => { return resolve() }).catch(() => { return resolve() })
+    })
+  }).then(() => {
+    /* React to the initial message */
+    return message.react(Config.reaction)
+  }).then(() => {
+    log(`${message.author.username} removed role "${role.name}" from "${member.displayName}"`)
+  }).catch((error) => {
+    if (!(error instanceof BreakSignal)) {
+      log(`Error removing "${role.name}" from "${member.displayName}"`)
+    }
   })
 }
 
@@ -104,77 +192,78 @@ Client.on('message', (message) => {
      that we are connected to */
   if (Config.serverIds.indexOf(message.guild.id) === -1) return
 
-  /* Go get our role that we want to use for members */
+  /* Go get our role that we want to use for naughty people */
   const role = message.guild.roles.find(r => r.name === Config.exileRoleName)
+
+  /* Go get the channel where we'll be printing our nice messages to the naughty people */
   const channel = message.guild.channels.find(channel => channel.name === Config.exileChannelName)
 
-  if (!role || !channel) return
+  /* If we couldn't get the correct role then we need to bail */
+  if (!role) return
 
+  /* Did someone call for an exile? */
   if (message.content.startsWith(`${Config.trigger}exile`)) {
+    /* Set the message to delete */
     message.delete(Config.deleteAfter).catch((error) => { log(error) })
 
-    if (Config.enforcers.indexOf(message.author.id) === -1) return
-
+    /* Loop through the mentioned users */
     message.mentions.members.forEach((member) => {
-      if (Config.enforcers.indexOf(member.id) !== -1) return
-
-      const oldNickname = member.displayName
-      const id = RandomNumber()
-      const newNickname = `${Config.inmateNamePrefix} ${id}`
-
-      isExiled(member.id).then((status) => {
-        if (status) {
-          log(`${oldNickname} is already exiled`)
-          throw new BreakSignal()
+      /* If we don't have access to run this command... */
+      if (Config.enforcers.indexOf(message.author.id) === -1) {
+        /* If we tried to exile an enforcer */
+        if (Config.enforcers.indexOf(member.id) !== -1) {
+          execExile(message, message.member, channel, role)
+          return setTimeout(() => {
+            execRelease(message, message.member, channel, role)
+          }, Config.drunktankTimer)
         }
-        return new Promise((resolve, reject) => {
-          member.setNickname(newNickname).then(() => { return resolve() }).catch(() => { return resolve() })
-        })
-      }).then(() => {
-        log(`${message.author.username} changed nickname of "${oldNickname}" to "${newNickname}"`)
-        return member.addRole(role)
-      }).then(() => {
-        return exile(member.id, oldNickname)
-      }).then(() => {
-        log(`${message.author.username} assigned role "${role.name}" to "${newNickname}"`)
-        const mention = member.toString()
-        return channel.send(`${mention} ${Config.exileMessage}`)
-      }).then(() => {
-        return message.react(Config.reaction)
-      }).catch((error) => {
-        if (!(error instanceof BreakSignal)) {
-          log(`Error assigning "${role.name}" to "${member.displayName}": ${error}`)
-        }
-      })
+
+        /* We're done here */
+        return
+      } else if (Config.enforcers.indexOf(message.author.id) === -1) {
+        /* We don't let enforcers exile enforcers */
+        return
+      }
+
+      execExile(message, member, channel, role)
     })
+  /* Or are we going to release the person */
   } else if (message.content.startsWith(`${Config.trigger}release`) || message.content.startsWith(`${Config.trigger}unexile`)) {
+    /* Set the message to delete */
     message.delete(Config.deleteAfter).catch((error) => { log(error) })
 
+    /* If we don't have permission to perform this command, then we'll pretend like nothing happened */
     if (Config.enforcers.indexOf(message.author.id) === -1) return
 
     message.mentions.members.forEach((member) => {
-      isExiled(member.id).then((status) => {
-        if (!status) {
-          log(`${member.displayName} is not currently exiled`)
-          throw new BreakSignal()
-        }
-        return release(member.id)
-      }).then((oldNickname) => {
-        return new Promise((resolve, reject) => {
-          member.setNickname(oldNickname).then(() => { return resolve() }).catch(() => { return resolve() })
-        })
-      }).then(() => {
-        return member.removeRole(role)
-      }).then(() => {
-        return message.react(Config.reaction)
-      }).then(() => {
-        log(`${message.author.username} removed role "${role.name}" from "${member.displayName}"`)
-      }).catch((error) => {
-        if (!(error instanceof BreakSignal)) {
-          log(`Error removing "${role.name}" from "${member.displayName}"`)
+      execRelease(message, member, channel, role)
+    })
+  } else if (message.content.startsWith(`${Config.trigger}crime`)) {
+    /* Set the message to delete */
+    message.delete(Config.deleteAfter).catch((error) => { log(error) })
+
+    const mention = message.member.toString()
+
+    /* If they aren't an enforcer, look at themselves */
+    if (Config.enforcers.indexOf(message.author.id) === -1) {
+      getExileReason(message.author.id).then((reason) => {
+        if (reason.length !== 0) {
+          reason = '```' + reason + '```'
+          return message.channel.send(`${mention} The message scrawled across your warrant states: ${reason}`).catch(() => {})
+        } else {
+          return message.channel.send(`${mention} There is no warant out for you`).catch(() => {})
         }
       })
-    })
+    } else {
+      const target = message.mentions.members.first()
+      if (!target) return
+
+      getExileReason(target.id).then((reason) => {
+        if (reason.length !== 0) {
+          return message.channel.send(`${mention}, the warrant for ${target} states: ${reason}`).catch(() => {})
+        }
+      })
+    }
   }
 })
 
@@ -182,27 +271,35 @@ Client.on('guildMemberAdd', (member) => {
   const role = member.guild.roles.find(r => r.name === Config.exileRoleName)
   const channel = member.guild.channels.find(channel => channel.name === Config.exileChannelName)
 
-  if (!role || !channel) return
+  if (!role) return
 
   const oldNickname = member.displayName
   const id = RandomNumber()
   const newNickname = `${Config.inmateNamePrefix} ${id}`
 
+  /* check to see if the joiner is in exiled */
   isExiled(member.id).then((status) => {
     if (!status) {
       throw new BreakSignal()
     }
 
+    /* Try to change their nickname */
     return new Promise((resolve, reject) => {
       member.setNickname(newNickname).then(() => { return resolve() }).catch(() => { return resolve() })
     })
   }).then(() => {
     log(`Autojoin changed nickname of "${oldNickname}" to "${newNickname}"`)
+
+    /* Add the role to their account */
     return member.addRole(role)
   }).then(() => {
     log(`Autojoin assigned role "${role.name}" to "${newNickname}"`)
     const mention = member.toString()
-    return channel.send(`${mention} ${Config.exileEvadeMessage}`)
+
+    /* Try to send a message to the channel letting them know they are exiled */
+    return new Promise((resolve, reject) => {
+      channel.send(`${mention} ${Config.exileEvadeMessage}`).then(() => { return resolve() }).catch(() => { return resolve() })
+    })
   }).catch((error) => {
     if (!(error instanceof BreakSignal)) {
       log(`Error handling user join`)
