@@ -251,6 +251,7 @@ Client.on('message', (message) => {
           execExile(message, message.member, channel, role)
           return setTimeout(() => {
             execRelease(message, message.member, channel, role)
+            log(`${message.author.username} has been released from the drunk tank`)
           }, Config.drunktankTimer)
         }
 
