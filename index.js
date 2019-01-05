@@ -207,6 +207,13 @@ function RandomNumber () {
   return gen()
 }
 
+function isEnforcer (id) {
+  if (Config.enforcers.indexOf(id) === -1) {
+    return false
+  }
+  return true
+}
+
 function log (message) {
   console.log(util.format('%s: %s', (new Date()).toUTCString(), message))
 }
@@ -237,9 +244,10 @@ Client.on('message', (message) => {
     /* Loop through the mentioned users */
     message.mentions.members.forEach((member) => {
       /* If we don't have access to run this command... */
-      if (Config.enforcers.indexOf(message.author.id) === -1) {
+      if (!isEnforcer(message.author.id)) {
         /* If we tried to exile an enforcer */
-        if (Config.enforcers.indexOf(member.id) !== -1) {
+        if (isEnforcer(member.id)) {
+          log(`${message.author.username} fought the law and the law won!`)
           execExile(message, message.member, channel, role)
           return setTimeout(() => {
             execRelease(message, message.member, channel, role)
@@ -248,7 +256,7 @@ Client.on('message', (message) => {
 
         /* We're done here */
         return
-      } else if (Config.enforcers.indexOf(message.author.id) === -1) {
+      } else if (isEnforcer(member.id)) {
         /* We don't let enforcers exile enforcers */
         return
       }
@@ -261,7 +269,7 @@ Client.on('message', (message) => {
     message.delete(Config.deleteAfter).catch((error) => { log(error) })
 
     /* If we don't have permission to perform this command, then we'll pretend like nothing happened */
-    if (Config.enforcers.indexOf(message.author.id) === -1) return
+    if (!isEnforcer(message.author.id)) return
 
     message.mentions.members.forEach((member) => {
       execRelease(message, member, channel, role)
@@ -273,7 +281,7 @@ Client.on('message', (message) => {
     const mention = message.member.toString()
 
     /* If they aren't an enforcer, look at themselves */
-    if (Config.enforcers.indexOf(message.author.id) === -1) {
+    if (!isEnforcer(message.author.id)) {
       getExileReason(message.author.id).then((reason) => {
         if (reason.length !== 0) {
           reason = '```' + reason + '```'
