@@ -297,7 +297,7 @@ Client.on('message', (message) => {
 
       getExileReason(target.id).then((reason) => {
         if (reason.length !== 0) {
-          return message.channel.send(`${mention}, the warrant for ${target} states: ${reason}`).catch(() => {})
+          return message.channel.send(`The warrant for ${target} states: ${reason}`).catch(() => {})
         }
       })
     }
@@ -346,4 +346,9 @@ Client.on('guildMemberAdd', (member) => {
 Client.login(Config.token).catch((err) => {
   log('There was an error logging into Discord... please check your token and try again')
   log(err.toString())
+})
+
+Client.on('error', (error) => {
+  log('The connection to discord encountered an error: ' + error.toString())
+  process.exit(1)
 })
