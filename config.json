@@ -1,6 +1,40 @@
 {
   "database": "./database.sqlite",
   "token": "<insert your bot token here>",
+  "translation": {
+    "apiKey": "<insert your google translate api key here>",
+    "notificationGuild": "462241531630190603",
+    "notificationChannel": "562311069117317120",
+    "triggerWords": [
+      "market",
+      "trade",
+      "price",
+      "exchange",
+      "tradeogre",
+      "tradeorge",
+      "pump",
+      "dump",
+      "hodl",
+      "dollar",
+      "usd",
+      "fiat",
+      "tradeeogre",
+      "tradogre",
+      "tradeogr",
+      "satoshi",
+      "sats",
+      "lits",
+      "lambo",
+      "moon",
+      "bull",
+      "bear",
+      "gains",
+      "otc",
+      "profit",
+      "loss",
+      "investment"
+    ]
+  },
   "serverIds": [
     "388915017187328002",
     "485551423128600588"
