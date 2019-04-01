@@ -5,10 +5,15 @@
 'use strict'
 
 const Config = require('./config.json')
-const util = require('util')
-const Sqlite3 = require('sqlite3')
 const Discord = require('discord.js')
+const Franc = require('franc')
+const ISO6391 = require('iso-639-1')
+const Sqlite3 = require('sqlite3')
+const Translator = require('google-translate')(Config.translation.apiKey)
+const util = require('util')
+
 const Client = new Discord.Client()
+
 const db = new Sqlite3.Database(Config.database, (err) => {
   if (err) {
     log('Could not connect to backend database')
@@ -141,6 +146,23 @@ function tryMessageReact (message, reaction) {
   })
 }
 
+function tryTranslation (message) {
+  return new Promise((resolve, reject) => {
+    const lang = Franc(message)
+    const langName = ISO6391.getName(lang) || lang
+
+    if (lang === 'eng') {
+      return resolve({ message: message, original: message, lang: 'English' })
+    }
+
+    Translator.translate(message, 'en', (error, translation) => {
+      if (error) return resolve({ message: message, original: message, lang: langName })
+      translation.detectedSourceLanguage = translation.detectedSourceLanguage.split('-', 1).join('')
+      return resolve({ message: translation.translatedText, original: message, lang: ISO6391.getName(translation.detectedSourceLanguage) })
+    })
+  })
+}
+
 function execExile (message, member, channel, role) {
   const oldNickname = member.displayName
   const id = RandomNumber()
@@ -220,6 +242,65 @@ function log (message) {
 
 Client.on('ready', () => {
   log(`Logged in as ${Client.user.tag}!`)
+})
+
+/* This handler is designed to check for market related talk in any language */
+Client.on('message', (message) => {
+  /* Check to make sure that we're in a monitored server */
+  if (Config.serverIds.indexOf(message.guild.id) === -1) return
+
+  const channelName = message.channel.name
+  const guildName = message.guild.name
+
+  /* Get the user so we can mention them later */
+  const mention = message.author.username
+  
+  if (mention.toLowerCase() === 'mee6') return
+
+  /* Try to translate the message */
+  tryTranslation(message.content).then((messageObj) => {
+    const msg = messageObj.message.toLowerCase()
+
+    /* Now loop through our trigger words and see if someone has been naughty */
+    var triggered = false
+    Config.translation.triggerWords.forEach((triggerWord) => {
+      triggerWord = triggerWord.toLowerCase()
+
+      if (msg.indexOf(triggerWord) !== -1) {
+        triggered = true
+      }
+    })
+
+    /* Ut oh, someone has been naughty */
+    if (triggered) {
+      const msgPayload = {
+        embed: {
+          title: `Market Talk in ${guildName} #${channelName}?`,
+          author: {
+            name: mention
+          },
+          url: `https://discordapp.com/channels/${message.guild.id}/${message.channel.id}/${message.id}`,
+          fields: [
+            {
+              name: 'Original Message',
+              value: messageObj.original
+            },
+            {
+              name: 'Translated',
+              value: msg
+            }
+          ],
+          footer: {
+            text: `Language: ${messageObj.lang}`
+          }
+        }
+      }
+      if (messageObj.lang === 'English') msgPayload.embed.fields.splice(-1, 1)
+      log(msg)
+      Client.guilds.get(Config.translation.notificationGuild).channels.get(Config.translation.notificationChannel)
+      Client.guilds.get(Config.translation.notificationGuild).channels.get(Config.translation.notificationChannel).send(msgPayload).catch((err) => { log(err) })
+    }
+  })
 })
 
 Client.on('message', (message) => {
