@@ -1,6 +1,6 @@
 {
   "name": "turtlecoin-exile-bot",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "TurtleCoin Discord Exile Bot",
   "main": "index.js",
   "scripts": {
