@@ -382,7 +382,7 @@ Client.on('message', (message) => {
         }
       })
     }
-  } else if (message.content.startsWith(`@${Config.exileRoleName}`)) {
+  } else if (message.content.startsWith(`<@&${Config.exileRoleId}>`)) {
     /* Did someone call @exiled? */
     return message.channel.send(`https://youtu.be/u0I5ZZ6dlto`).catch(() => {})
   }
