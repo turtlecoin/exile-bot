@@ -254,7 +254,7 @@ Client.on('message', (message) => {
 
   /* Get the user so we can mention them later */
   const mention = message.author.username
-  
+
   if (mention.toLowerCase() === 'mee6') return
 
   /* Try to translate the message */
