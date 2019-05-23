@@ -73,10 +73,7 @@ function getExileReason (id) {
 }
 
 function exile (id, oldNickname, reason) {
-  reason = reason || ''
-  reason = reason.replace(`${Config.trigger}exile`, '')
-  reason = reason.replace(/<@[0-9]*>/, '')
-  reason = reason.trim()
+  reason = cleanMessage(reason)
   return new Promise((resolve, reject) => {
     run('REPLACE INTO exiled_users (id, oldNickname, reason) VALUES (?,?,?)', [id, oldNickname, reason]).then(() => {
       return resolve(true)
@@ -194,6 +191,24 @@ function execExile (message, member, channel, role) {
   })
 }
 
+function execRename (message, member) {
+  const oldNickname = member.displayName
+  const newNickname = cleanMessage(message.content.toString())
+
+  tryChangeNickname(member, newNickname).then((success) => {
+    if (success) {
+      log(`${message.author.username} changed nickname of "${oldNickname}" to "${newNickname}"`)
+    }
+
+    /* React to the initial message */
+    return tryMessageReact(message, Config.reaction)
+  }).catch((error) => {
+    if (!(error instanceof BreakSignal)) {
+      log(`Error changing nickname of "${oldNickname}" to "${newNickname}": ${error}`)
+    }
+  })
+}
+
 function execRelease (message, member, channel, role) {
   /* Check to see if they are already exiled */
   isExiled(member.id).then((result) => {
@@ -234,6 +249,17 @@ function isEnforcer (id) {
     return false
   }
   return true
+}
+
+function cleanMessage (msg) {
+  msg = msg || ''
+  msg = msg.replace(`${Config.trigger}exile`, '')
+  msg = msg.replace(`${Config.trigger}unexile`, '')
+  msg = msg.replace(`${Config.trigger}crime`, '')
+  msg = msg.replace(`${Config.trigger}release`, '')
+  msg = msg.replace(`${Config.trigger}rename`, '')
+  msg = msg.replace(/<@!?[0-9]*>/, '')
+  return msg.trim()
 }
 
 function log (message) {
@@ -383,8 +409,21 @@ Client.on('message', (message) => {
       })
     }
   } else if (message.content.startsWith(`@${Config.exileRoleName}`)) {
+    /* Set the message to delete */
+    message.delete(Config.deleteAfter).catch((error) => { log(error) })
+
     /* Did someone call @exiled? */
     return message.channel.send(`https://youtu.be/u0I5ZZ6dlto`).catch(() => {})
+  } else if (message.content.startsWith(`${Config.trigger}rename`)) {
+    /* Set the message to delete */
+    message.delete(Config.deleteAfter).catch((error) => { log(error) })
+
+    /* If we don't have permission to perform this command, then we'll pretend like nothing happened */
+    if (!isEnforcer(message.author.id)) return
+
+    const member = message.mentions.members.first()
+
+    execRename(message, member)
   }
 })
 
