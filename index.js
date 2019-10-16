@@ -153,7 +153,7 @@ function tryTranslation (message) {
     }
 
     if (!Config.translation.apiKey) {
-      return resolve({ message: message, original: message, lang: 'Translation Disabled' })
+      return resolve({ message: message, original: message, lang: 'disabled' })
     }
 
     Translator.translate(message, 'en', (error, translation) => {
@@ -327,7 +327,7 @@ Client.on('message', (message) => {
           }
         }
       }
-      if (messageObj.lang === 'English') msgPayload.embed.fields.splice(-1, 1)
+      if (messageObj.lang === 'English' || messageObj.lang === 'disabled') msgPayload.embed.fields.splice(-1, 1)
       log(msg)
       Client.guilds.get(Config.translation.notificationGuild).channels.get(Config.translation.notificationChannel)
       Client.guilds.get(Config.translation.notificationGuild).channels.get(Config.translation.notificationChannel).send(msgPayload).catch((err) => { log(err) })
