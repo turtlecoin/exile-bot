@@ -198,10 +198,12 @@ function execRename (message, member) {
   tryChangeNickname(member, newNickname).then((success) => {
     if (success) {
       log(`${message.author.username} changed nickname of "${oldNickname}" to "${newNickname}"`)
-    }
 
-    /* React to the initial message */
-    return tryMessageReact(message, Config.reaction)
+      /* React to the initial message, but only if it works */
+      return tryMessageReact(message, Config.reaction)
+    } else {
+      throw new Error('I sorry, I cannot do that Dave')
+    }
   }).catch((error) => {
     if (!(error instanceof BreakSignal)) {
       log(`Error changing nickname of "${oldNickname}" to "${newNickname}": ${error}`)
@@ -413,7 +415,7 @@ Client.on('message', (message) => {
     message.delete(Config.deleteAfter).catch((error) => { log(error) })
 
     /* Did someone call @exiled? */
-    return message.channel.send(`https://youtu.be/u0I5ZZ6dlto`).catch(() => {})
+    return message.channel.send('https://youtu.be/u0I5ZZ6dlto').catch(() => {})
   } else if (message.content.startsWith(`${Config.trigger}rename`)) {
     /* Set the message to delete */
     message.delete(Config.deleteAfter).catch((error) => { log(error) })
@@ -460,7 +462,7 @@ Client.on('guildMemberAdd', (member) => {
     return tryChannelSendMessage(channel, `${mention} ${Config.exileEvadeMessage}`)
   }).catch((error) => {
     if (!(error instanceof BreakSignal)) {
-      log(`Error handling user join`)
+      log('Error handling user join')
       console.log(error)
     }
   })
