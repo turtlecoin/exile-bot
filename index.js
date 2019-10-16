@@ -152,6 +152,10 @@ function tryTranslation (message) {
       return resolve({ message: message, original: message, lang: 'English' })
     }
 
+    if (!Config.translation.apiKey) {
+      return resolve({ message: message, original: message, lang: 'Translation Disabled' })
+    }
+
     Translator.translate(message, 'en', (error, translation) => {
       if (error) return resolve({ message: message, original: message, lang: langName })
       translation.detectedSourceLanguage = translation.detectedSourceLanguage.split('-', 1).join('')
