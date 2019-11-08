@@ -164,7 +164,7 @@ function tryTranslation (message) {
   })
 }
 
-function execExile (message, member, channel, role) {
+function execExile (message, member, channel, role, removeRole) {
   const oldNickname = member.displayName
   const id = RandomNumber()
   const newNickname = `${Config.inmateNamePrefix} ${id}`
@@ -176,6 +176,11 @@ function execExile (message, member, channel, role) {
     }
     /* Add the role to their account */
     return tryAddRole(member, role)
+  }).then(() => {
+    /* Remove the role if necesseary */
+    if (removeRole) {
+      return tryRemoveRole(member, removeRole)
+    }
   }).then(() => {
     /* Store the exile in the database */
     return exile(member.id, oldNickname, message.content.toString())
@@ -343,6 +348,9 @@ Client.on('message', (message) => {
   /* Go get our role that we want to use for naughty people */
   const role = message.guild.roles.find(r => r.name === Config.exileRoleName)
 
+  /* Go get the role that we need to remove */
+  const removeRole = message.guild.roles.find(r => r.name === Config.removeRole)
+
   /* Go get the channel where we'll be printing our nice messages to the naughty people */
   const channel = message.guild.channels.find(channel => channel.name === Config.exileChannelName)
 
@@ -361,7 +369,7 @@ Client.on('message', (message) => {
         /* If we tried to exile an enforcer */
         if (isEnforcer(member.id)) {
           log(`${message.author.username} fought the law and the law won!`)
-          execExile(message, message.member, channel, role)
+          execExile(message, message.member, channel, role, removeRole)
           return setTimeout(() => {
             execRelease(message, message.member, channel, role)
             log(`${message.author.username} has been released from the drunk tank`)
@@ -375,7 +383,7 @@ Client.on('message', (message) => {
         return
       }
 
-      execExile(message, member, channel, role)
+      execExile(message, member, channel, role, removeRole)
     })
   /* Or are we going to release the person */
   } else if (message.content.startsWith(`${Config.trigger}release`) || message.content.startsWith(`${Config.trigger}unexile`)) {
