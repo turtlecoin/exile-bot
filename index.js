@@ -305,6 +305,9 @@ function execReleaseAll (message, role) {
       /* React to the initial message */
       return tryMessageReact(message, Config.reaction)
     })
+    .then(() => {
+      log(`${message.author.username} removed role "${role.name}" from all currently connected inmates ["${members.length}"]`)
+    })
     .catch(error => {
       if (!(error instanceof BreakSignal)) {
         log(`Error removing "${role.name}" from all exiled users`)
@@ -454,8 +457,8 @@ Client.on('message', (message) => {
     })
   /* Or are we going to release everyone */
   } else if (message.content.startsWith(`${Config.trigger}releaseall`)) {
-    /* Set the message to delete */
-    message.delete(Config.deleteAfter).catch((error) => { log(error) })
+    /* Set the message to delete - it deletes slower because it often takes longer */
+    message.delete(Config.deleteAfter * 10).catch((error) => { log(error) })
 
     /* If we don't have permission to perform this command, then we'll pretend like nothing happened */
     if (!isEnforcer(message.author.id)) return
