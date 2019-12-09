@@ -306,7 +306,7 @@ function execReleaseAll (message, role) {
       return tryMessageReact(message, Config.reaction)
     })
     .then(() => {
-      log(`${message.author.username} removed role "${role.name}" from all currently connected inmates ["${members.length}"]`)
+      log(`${message.author.username} removed role "${role.name}" from all currently connected inmates [${members.length}]`)
     })
     .catch(error => {
       if (!(error instanceof BreakSignal)) {
