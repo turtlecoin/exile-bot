@@ -1,6 +1,6 @@
 {
   "name": "turtlecoin-exile-bot",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "TurtleCoin Discord Exile Bot",
   "main": "index.js",
   "scripts": {
@@ -12,6 +12,7 @@
   "dependencies": {
     "bufferutil": "^4.0.1",
     "discord.js": "^11.5.1",
+    "dotenv": "^8.2.0",
     "erlpack": "^0.1.2",
     "franc": "^4.0.0",
     "google-translate": "^2.3.0",

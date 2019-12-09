@@ -4,6 +4,7 @@
 
 'use strict'
 
+require('dotenv').config()
 const Config = require('./config.json')
 const Discord = require('discord.js')
 const Franc = require('franc')
@@ -43,10 +44,22 @@ function run (query, args) {
 }
 
 function get (query, args) {
+  args = args || []
   return new Promise((resolve, reject) => {
     db.get(query, args, (err, row) => {
       if (err || !row) return reject(err)
       return resolve(row)
+    })
+  })
+}
+
+function getAll (query, args) {
+  args = args || []
+  return new Promise((resolve, reject) => {
+    db.all(query, args, (err, rows) => {
+      if (err || !rows) return reject(err)
+
+      return resolve(rows)
     })
   })
 }
@@ -60,6 +73,11 @@ function isExiled (id) {
       return resolve({ status: false })
     })
   })
+}
+
+function getAllExiled () {
+  return getAll('SELECT * FROM exiled_users')
+    .catch(() => { return [] })
 }
 
 function getExileReason (id) {
@@ -245,6 +263,55 @@ function execRelease (message, member, channel, role) {
   })
 }
 
+function execReleaseAll (message, role) {
+  const members = []
+  const nicknames = {}
+  getAllExiled()
+    .then(rows => {
+      rows.forEach(row => {
+        const member = message.guild.members.find(r => r.id === row.id)
+
+        if (member) {
+          nicknames[member.id] = row.oldNickname
+          members.push(member)
+        }
+      })
+    })
+    .then(() => {
+      /* Try to change all the nicknames back */
+      const promises = []
+
+      members.forEach(member => promises.push(tryChangeNickname(member, nicknames[member.id])))
+
+      return Promise.all(promises)
+    })
+    .then(() => {
+      /* Remove the role from their accounts */
+      const promises = []
+
+      members.forEach(member => promises.push(tryRemoveRole(member, role)))
+
+      return Promise.all(promises)
+    })
+    .then(() => {
+      /* remove the exiles from the database */
+      const promises = []
+
+      members.forEach(member => promises.push(release(member.id)))
+
+      return Promise.all(promises)
+    })
+    .then(() => {
+      /* React to the initial message */
+      return tryMessageReact(message, Config.reaction)
+    })
+    .catch(error => {
+      if (!(error instanceof BreakSignal)) {
+        log(`Error removing "${role.name}" from all exiled users`)
+      }
+    })
+}
+
 function RandomNumber () {
   const rn = require('random-number')
   const gen = rn.generator({
@@ -385,6 +452,16 @@ Client.on('message', (message) => {
 
       execExile(message, member, channel, role, removeRole)
     })
+  /* Or are we going to release everyone */
+  } else if (message.content.startsWith(`${Config.trigger}releaseall`)) {
+    /* Set the message to delete */
+    message.delete(Config.deleteAfter).catch((error) => { log(error) })
+
+    /* If we don't have permission to perform this command, then we'll pretend like nothing happened */
+    if (!isEnforcer(message.author.id)) return
+
+    execReleaseAll(message, role)
+
   /* Or are we going to release the person */
   } else if (message.content.startsWith(`${Config.trigger}release`) || message.content.startsWith(`${Config.trigger}unexile`)) {
     /* Set the message to delete */
@@ -480,12 +557,13 @@ Client.on('guildMemberAdd', (member) => {
   })
 })
 
-Client.login(Config.token).catch((err) => {
-  log('There was an error logging into Discord... please check your token and try again')
-  log(err.toString())
-})
+Client.login(process.env.DISCORD_TOKEN || Config.token)
+  .catch(err => {
+    log('There was an error logging into Discord... please check your token and try again')
+    log(err.toString())
+  })
 
-Client.on('error', (error) => {
+Client.on('error', error => {
   log('The connection to discord encountered an error: ' + error.toString())
   process.exit(1)
 })
