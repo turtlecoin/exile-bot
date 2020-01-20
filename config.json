@@ -35,7 +35,10 @@
       "investment"
     ]
   },
-  "serverIds": ["388915017187328002", "485551423128600588"],
+  "serverIds": [
+    "388915017187328002",
+    "485551423128600588"
+  ],
   "enforcers": [
     "411182783403393025",
     "354701063955152898",
@@ -44,6 +47,19 @@
     "388916188715155467",
     "408364361598369802"
   ],
+  "protectedUsernames": [
+    "rocksteady",
+    "zpalmtree",
+    "iburnmycd",
+    "fexra",
+    "soregums",
+    "canti"
+  ],
+  "protectedNotification": {
+    "guild": "388915017187328002",
+    "channel": "general",
+    "role": "🗡️"
+  },
   "exileRoleName": "exiled",
   "removeRole": "🐢",
   "exileChannelName": "exile",

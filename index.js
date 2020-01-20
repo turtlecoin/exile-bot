@@ -10,7 +10,7 @@ const Discord = require('discord.js')
 const Franc = require('franc')
 const ISO6391 = require('iso-639-1')
 const Sqlite3 = require('sqlite3')
-const Translator = require('google-translate')(Config.translation.apiKey)
+const Translator = require('google-translate')(process.env.GOOGLE_API_KEY || Config.translation.apiKey)
 const util = require('util')
 
 const Client = new Discord.Client()
@@ -520,6 +520,78 @@ Client.on('message', (message) => {
     execRename(message, member)
   }
 })
+
+function handleProtected (member) {
+  if (isEnforcer(member.id)) return
+  const role = member.guild.roles.find(r => r.name === Config.exileRoleName)
+  const notificationRole = member.guild.roles.find(r => r.name === Config.protectedNotification.role)
+  const channel = member.guild.channels.find(channel => channel.name === Config.exileChannelName)
+  const notificationChannel = member.guild.channels.find(channel => channel.name === Config.protectedNotification.channel)
+
+  if (!role) return
+
+  const oldNickname = member.displayName
+  const id = RandomNumber()
+  const newNickname = `${Config.inmateNamePrefix} ${id}`
+
+  Config.protectedUsernames.forEach(nick => {
+    if (oldNickname.toLowerCase().indexOf(nick.toLowerCase()) !== -1) {
+      log(`${oldNickname} joined with a protected username... sending them to exile`)
+
+      return tryChangeNickname(member, newNickname)
+        .then(() => {
+          log(`Autojoin changed nickname of "${oldNickname}" to "${newNickname}"`)
+
+          return tryAddRole(member, role)
+        })
+        .then(() => {
+          log(`Autojoin assigned role "${role.name}" to "${newNickname}"`)
+          const mention = member.toString()
+
+          /* Try to send a message to the channel letting them know they are exiled */
+          return tryChannelSendMessage(channel, `${mention} Excellent. You've joined with a protected nickname. We don't support scamming users here. Sorry.`)
+        })
+        .then(() => {
+          const msgPayload = {
+            embed: {
+              title: 'Possible Scammer Alert!',
+              author: {
+                name: oldNickname
+              },
+              fields: [
+                {
+                  name: 'Look what I found!',
+                  value: 'This user has joined with a protected nickname. Please be vigilant if you have ignored our warnings about turning DMs off.'
+                },
+                {
+                  name: 'Exiled Name',
+                  value: newNickname
+                }
+              ],
+              footer: {
+                text: 'Seriously, turn off your DMs.'
+              }
+            }
+          }
+
+          return notificationChannel.send(msgPayload).catch((err) => { log(err) })
+        })
+        .then(() => {
+          return tryChannelSendMessage(notificationChannel, `Going to need some help with this one ${notificationRole}... please handle...`)
+        })
+        .catch((error) => {
+          if (!(error instanceof BreakSignal)) {
+            log('Error handling user join')
+            console.log(error)
+          }
+        })
+    }
+  })
+}
+
+/* This handler is designed to grab naughty users that try to use protected usernames */
+Client.on('guildMemberAdd', member => handleProtected(member))
+Client.on('guildMemberUpdate', (oldMember, newMember) => handleProtected(newMember))
 
 Client.on('guildMemberAdd', (member) => {
   const role = member.guild.roles.find(r => r.name === Config.exileRoleName)
