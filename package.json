@@ -11,12 +11,12 @@
   "license": "AGPL-3.0",
   "dependencies": {
     "bufferutil": "^4.0.1",
-    "discord.js": "^11.5.1",
+    "discord.js": "^11.6.3",
     "dotenv": "^8.2.0",
     "erlpack": "^0.1.2",
     "franc": "^4.0.0",
     "google-translate": "^2.3.0",
-    "iso-639-1": "^2.1.0",
+    "iso-639-1": "^2.1.1",
     "random-number": "0.0.9",
     "sqlite3": "^4.1.0",
     "uws": "^100.0.1"
